@@ -65,8 +65,24 @@
 #define HAVE_SSE2
 #endif
 
-#if !defined(HAVE_SSE2)
-#error "This code requires at least SSE2."
+#if defined(_MSC_VER)
+#if defined(_M_X64) || defined(_M_AMD64)
+    // SSE2 is always available on x64
+    #define HAVE_SSE2
+#elif defined(_M_IX86)
+    #if _M_IX86_FP >= 2
+        // SSE2 is available
+        #define HAVE_SSE2
+    #else
+        #error "SSE2 not enabled. Check project settings."
+    #endif
+#endif
+#else
+    // Not Visual Studio compiler
+    #if !defined(HAVE_SSE2)
+    #error "This code requires at least SSE2."
+    #endif
+
 #endif
 
 #endif

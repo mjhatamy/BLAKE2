@@ -25,3 +25,5 @@ neon/blake2bp
 neon/blake2xs
 neon/blake2xb
 **tags
+.idea
+cmake-*
