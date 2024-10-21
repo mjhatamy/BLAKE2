@@ -100,16 +100,22 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/testvectors)
 
 # Create the static library
 add_library(${PROJECT_NAME}s STATIC ${BLAKE2s_SOURCES})
-
+# Set include directories for the target
+target_include_directories(${PROJECT_NAME}s
+        PUBLIC
+        $<BUILD_INTERFACE:${SOURCE_PATH}>
+        $<INSTALL_INTERFACE:include>
+)
 # Add compiler flags
 add_compiler_flags(${PROJECT_NAME}s)
 
 # Set the public header
 set_target_properties(${PROJECT_NAME}s PROPERTIES
         PUBLIC_HEADER "${SOURCE_PATH}/blake2.h"
-        C_VISIBILITY_PRESET hidden
-        VISIBILITY_INLINES_HIDDEN ON
 )
+
+# Make the target available for other projects in the build tree
+add_library(blake2::blake2s ALIAS blake2s)
 
 # Installation rules
 install(TARGETS ${PROJECT_NAME}s
