@@ -1,54 +1,117 @@
-cmake_minimum_required(VERSION 3.10)  # Minimum CMake version
+cmake_minimum_required(VERSION 3.10)
 project(blake2 VERSION 1.0 LANGUAGES C)
 
-# Enable SSE2 and NEON flags based on platform
+# Include necessary modules
 include(CheckCCompilerFlag)
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
 
-set(BLAKE2s_SOURCES )
-
-message(STATUS "${CMAKE_SYSTEM_PROCESSOR} Processor detected")
-# Set compiler flags for optimizations and SSE2/NEON
-if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64" OR CMAKE_SYSTEM_PROCESSOR MATCHES "AMD64" OR CMAKE_SYSTEM_PROCESSOR MATCHES "i686")
+# Function to check and add compiler flags
+function(add_compiler_flags target)
     if(MSVC)
-        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /arch:SSE2")  # For SSE2 on x86 with MSVC
+        target_compile_options(${target} PRIVATE
+                $<$<CONFIG:Release>:/O2>
+                $<$<CONFIG:Debug>:/Od>
+                /W4
+        )
     else()
-        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -msse2 -Wall -Wextra -std=c89 -pedantic -Wno-long-long")  # For SSE2 on x86 with GCC/MinGW and additional flags
+        target_compile_options(${target} PRIVATE
+                $<$<CONFIG:Release>:-O3>
+                $<$<CONFIG:Debug>:-O0>
+                -Wall
+                -Wextra
+                -std=c89
+                -pedantic
+                -Wno-long-long
+        )
     endif()
+endfunction()
 
+# Initialize source variables
+set(BLAKE2s_SOURCES)
+set(SOURCE_PATH "")
+
+# Detect platform and set appropriate sources and flags
+message(STATUS "Processor detected: ${CMAKE_SYSTEM_PROCESSOR}")
+
+# Check for SSE2 support
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64|i686)$")
     set(SOURCE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/sse")
-    list(APPEND BLAKE2s_SOURCES ${SOURCE_PATH}/blake2s.c ${SOURCE_PATH}/blake2.h ${SOURCE_PATH}/blake2s-load-sse41.h)
-elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "arm")
+
     if(MSVC)
-        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mfpu=neon")  # For NEON on ARM
+        # Check if SSE2 is supported
+        check_c_compiler_flag("/arch:SSE2" COMPILER_SUPPORTS_SSE2)
+        if(COMPILER_SUPPORTS_SSE2)
+            add_compile_options("/arch:SSE2")
+        else()
+            message(FATAL_ERROR "SSE2 support is required but not available")
+        endif()
     else()
-        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mfpu=neon -Wall -Wextra -std=c89 -pedantic -Wno-long-long")  # For NEON on ARM and additional flags
+        # Check if SSE2 is supported for GCC/Clang
+        check_c_compiler_flag("-msse2" COMPILER_SUPPORTS_SSE2)
+        if(COMPILER_SUPPORTS_SSE2)
+            add_compile_options("-msse2")
+        else()
+            message(FATAL_ERROR "SSE2 support is required but not available")
+        endif()
     endif()
 
+    list(APPEND BLAKE2s_SOURCES
+            ${SOURCE_PATH}/blake2s.c
+            ${SOURCE_PATH}/blake2.h
+            ${SOURCE_PATH}/blake2s-load-sse41.h
+    )
+
+    # Check for ARM NEON support
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm|aarch64)")
     set(SOURCE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/neon")
-    list(APPEND BLAKE2s_SOURCES ${SOURCE_PATH}/blake2s.c ${SOURCE_PATH}/blake2s-load-sse2.h)
-endif()
 
-# Add optimization flags
-if(MSVC)
-    set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} /O2")
-    set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} /Od")
+    if(MSVC)
+        check_c_compiler_flag("/arch:NEON" COMPILER_SUPPORTS_NEON)
+        if(COMPILER_SUPPORTS_NEON)
+            add_compile_options("/arch:NEON")
+        else()
+            message(FATAL_ERROR "NEON support is required but not available")
+        endif()
+    else()
+        check_c_compiler_flag("-mfpu=neon" COMPILER_SUPPORTS_NEON)
+        if(COMPILER_SUPPORTS_NEON)
+            add_compile_options("-mfpu=neon")
+        else()
+            message(FATAL_ERROR "NEON support is required but not available")
+        endif()
+    endif()
+
+    list(APPEND BLAKE2s_SOURCES
+            ${SOURCE_PATH}/blake2s.c
+            ${SOURCE_PATH}/blake2s-load-sse2.h
+    )
 else()
-    set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O3")
-    set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -O0")
+    message(FATAL_ERROR "Unsupported processor architecture: ${CMAKE_SYSTEM_PROCESSOR}")
 endif()
 
+# Verify that we have sources
+if(NOT BLAKE2s_SOURCES)
+    message(FATAL_ERROR "No source files were selected for the current platform")
+endif()
+
+# Add include directories
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/testvectors)
 
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/testvectors)
-
-# Create a static library
+# Create the static library
 add_library(${PROJECT_NAME}s STATIC ${BLAKE2s_SOURCES})
 
-# Set the public header files
-set_target_properties(${PROJECT_NAME}s PROPERTIES PUBLIC_HEADER "${SOURCE_PATH}/blake2.h")
+# Add compiler flags
+add_compiler_flags(${PROJECT_NAME}s)
+
+# Set the public header
+set_target_properties(${PROJECT_NAME}s PROPERTIES
+        PUBLIC_HEADER "${SOURCE_PATH}/blake2.h"
+        C_VISIBILITY_PRESET hidden
+        VISIBILITY_INLINES_HIDDEN ON
+)
 
 # Installation rules
-include(GNUInstallDirs)
 install(TARGETS ${PROJECT_NAME}s
         EXPORT ${PROJECT_NAME}sTargets
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -57,28 +120,28 @@ install(TARGETS ${PROJECT_NAME}s
         PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME}
 )
 
-# Generate and install export file
+# Export targets
 install(EXPORT ${PROJECT_NAME}sTargets
         FILE ${PROJECT_NAME}sTargets.cmake
         NAMESPACE ${PROJECT_NAME}::
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}
 )
 
-# Generate the config file
-include(CMakePackageConfigHelpers)
-configure_package_config_file(${CMAKE_CURRENT_SOURCE_DIR}/Config.cmake.in
+# Generate config file
+configure_package_config_file(
+        ${CMAKE_CURRENT_SOURCE_DIR}/Config.cmake.in
         "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Config.cmake"
         INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}
 )
 
-# Generate the version file
+# Generate version file
 write_basic_package_version_file(
         "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
         VERSION ${PROJECT_VERSION}
         COMPATIBILITY SameMajorVersion
 )
 
-# Install the config and version files
+# Install config files
 install(FILES
         "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Config.cmake"
         "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
