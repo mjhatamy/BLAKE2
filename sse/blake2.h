@@ -177,6 +177,7 @@ extern "C" {
 
   /* Simple API */
   int blake2s( void *out, size_t outlen, const void *in, size_t inlen, const void *key, size_t keylen );
+  int blake2s_2in( void *out, size_t outlen, const void *in, size_t inlen, const void *in2, size_t in2len, const void *key, size_t keylen );
   int blake2b( void *out, size_t outlen, const void *in, size_t inlen, const void *key, size_t keylen );
 
   int blake2sp( void *out, size_t outlen, const void *in, size_t inlen, const void *key, size_t keylen );
