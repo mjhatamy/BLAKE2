@@ -28,13 +28,8 @@
 extern "C" {
 #endif
 
-  // The blocksize of BLAKE2s in bytes.
 #define Blake2sBlockSize 64
-
-  // The hash size of BLAKE2s-256 in bytes.
 #define Blake2sSize256 32
-
-  // The hash size of BLAKE2s-128 in bytes.
 #define Blake2sSize128 16
 
   enum blake2s_constant
