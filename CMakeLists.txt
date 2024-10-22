@@ -1,6 +1,11 @@
 cmake_minimum_required(VERSION 3.10)
 project(blake2 VERSION 1.0 LANGUAGES C)
 
+# Use C11 as the C standard
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_C_STANDARD_REQUIRED ON)
+set(CMAKE_C_EXTENSIONS OFF)
+
 # Include necessary modules
 include(CheckCCompilerFlag)
 include(GNUInstallDirs)
