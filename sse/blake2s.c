@@ -317,6 +317,38 @@ int blake2s_2in( void *out, size_t outlen, const void *in, size_t inlen, const v
   return 0;
 }
 
+int blake2s_3in( void *out, size_t outlen, const void *in, size_t inlen, const void *in2, size_t in2len, const void *in3, size_t in3len, const void *key, size_t keylen ) {
+  blake2s_state S[1];
+
+  /* Verify parameters */
+  if ( NULL == in && inlen > 0 ) return -1;
+  if ( NULL == in2 && in2len > 0 ) return -1;
+  if ( NULL == in3 && in3len > 0 ) return -1;
+
+  if ( NULL == out ) return -1;
+
+  if ( NULL == key && keylen > 0) return -1;
+
+  if( !outlen || outlen > BLAKE2S_OUTBYTES ) return -1;
+
+  if( keylen > BLAKE2S_KEYBYTES ) return -1;
+
+  if( keylen > 0 )
+  {
+    if( blake2s_init_key( S, outlen, key, keylen ) < 0 ) return -1;
+  }
+  else
+  {
+    if( blake2s_init( S, outlen ) < 0 ) return -1;
+  }
+
+  blake2s_update( S, ( const uint8_t * )in, inlen );
+  blake2s_update( S, ( const uint8_t * )in2, in2len );
+  blake2s_update( S, ( const uint8_t * )in3, in3len );
+  blake2s_final( S, out, outlen );
+  return 0;
+}
+
 #if defined(SUPERCOP)
 int crypto_hash( unsigned char *out, unsigned char *in, unsigned long long inlen )
 {
